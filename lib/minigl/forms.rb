@@ -52,7 +52,9 @@ module MiniGL
     # for each specific component class.
     attr_accessor :params
 
-    def initialize(x, y, w, h, font, text, text_color=0xffffff, disabled_text_color=nil,
+    def initialize(x, y, w, h, font, text,
+                  text_color=0xffffff, disabled_text_color=nil, text_align=:left,
+                  text_padding=[0,0],
                   box_bg=nil, box_bg_disabled=nil, box_borders=nil, box_visible=true) # :nodoc:
       @x = x
       @y = y
@@ -62,11 +64,15 @@ module MiniGL
       @text = text
       @text_color = text_color
       @disabled_text_color = disabled_text_color
+      @text_align = text_align
+      @text_padding = text_padding
       @box_bg = box_bg
       @box_bg_disabled = box_bg_disabled
       @box_borders = box_borders
       @box_visible = box_visible
       @enabled = @visible = true
+
+      @th = MiniGL::TextHelper.new @font
     end
 
     def text=(value)
@@ -77,17 +83,18 @@ module MiniGL
 
     def update; end # :nodoc:
 
+    def draw_box(c, z_index)
+      G.window.draw_quad @x, @y, c,
+                         @x + @w, @y, c,
+                         @x + @w, @y + @h, c,
+                         @x, @y + @h, c, z_index
+
+    end
+
     def draw(alpha = 255, z_index = 0, color = 0xffffff)
       return unless @visible
 
-      if draw_box?
-        c = @box_bg
-        G.window.draw_quad @x, @y, c,
-                           @x + @w, @y, c,
-                           @x + @w, @y + @h, c,
-                           @x, @y + @h, c, z_index
-      end
-
+      draw_box(@box_bg, z_index) if draw_box?
     end
 
     # Sets the position of the component.
@@ -1465,7 +1472,8 @@ module MiniGL
     # [scale_y] The vertical scale factor.
     # [anchor] See parameter with the same name in <code>Panel#initialize</code> for details.
     def initialize(x, y=nil, w=nil, h=nil, font=nil, text=nil,
-                   text_color=0, disabled_text_color=0,
+                   text_color=0, disabled_text_color=0, text_align=:left,
+                   text_padding=[0,0],
                    scale_x=1, scale_y=1,
                    box_bg=nil, box_bg_disabled=nil, box_borders=nil, box_visible=true,
                    anchor=nil)
@@ -1483,12 +1491,17 @@ module MiniGL
 
       @scale_x = scale_x
       @scale_y = scale_y
-      @w = font.text_width(text) * scale_x
-      @h = font.height * scale_y
+      # Are we auto-sizing? If not we can provide text alignment with TextHelper.
+      @auto_w  = w.nil?
+      @auto_h  = h.nil?
+      @text_w  = font.text_width(text) * scale_x
+      @text_h  = font.height * scale_y
+      @w = w || @text_w
+      @h = h || @text_h
       @anchor_offset_x = x; @anchor_offset_y = y
       @anchor, x, y = FormUtils.check_anchor(anchor, x, y, @w, @h)
-      super(x, y, w, h, font, text,
-            text_color, disabled_text_color,
+      super(x, y, @w, @h, font, text,
+            text_color, disabled_text_color, text_align, text_padding,
             box_bg, box_bg_disabled, box_borders, box_visible)
     end
 
@@ -1513,7 +1526,12 @@ module MiniGL
       g1 *= g2; g1 /= 255
       b1 *= b2; b1 /= 255
       color = (alpha << 24) | (r1 << 16) | (g1 << 8) | b1
-      @font.draw_text(@text, @x, @y, z_index+100, @scale_x, @scale_y, color)
+      # Determine width for text box
+      w = @w - @text_padding[0] * 2
+      x = @text_align==:center ? @x+w/2 : @x + @text_padding[0]
+      y = @y + @text_padding[1]
+      @th.write_breaking(@text, x, y, w, @text_align,
+                         color, alpha=0xff, z_index=z_index+100)
     end
   end
 end
