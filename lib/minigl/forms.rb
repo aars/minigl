@@ -52,17 +52,43 @@ module MiniGL
     # for each specific component class.
     attr_accessor :params
 
-    def initialize(x, y, font, text, text_color, disabled_text_color) # :nodoc:
+    def initialize(x, y, w, h, font, text, text_color=0xffffff, disabled_text_color=nil,
+                  box_bg=nil, box_bg_disabled=nil, box_borders=nil, box_visible=true) # :nodoc:
       @x = x
       @y = y
+      @w = w
+      @h = h
       @font = font
       @text = text
       @text_color = text_color
       @disabled_text_color = disabled_text_color
+      @box_bg = box_bg
+      @box_bg_disabled = box_bg_disabled
+      @box_borders = box_borders
+      @box_visible = box_visible
       @enabled = @visible = true
     end
 
+    def text=(value)
+      @text = value
+    end
+
+    def draw_box?; @box_visible && !!@box_bg; end
+
     def update; end # :nodoc:
+
+    def draw(alpha = 255, z_index = 0, color = 0xffffff)
+      return unless @visible
+
+      if draw_box?
+        c = @box_bg
+        G.window.draw_quad @x, @y, c,
+                           @x + @w, @y, c,
+                           @x + @w, @y + @h, c,
+                           @x, @y + @h, c, z_index
+      end
+
+    end
 
     # Sets the position of the component.
     # Parameters:
@@ -305,7 +331,7 @@ module MiniGL
       @anchor_offset_x = x; @anchor_offset_y = y
       @anchor, x, y = FormUtils.check_anchor(anchor, x, y, @w, @h)
 
-      super x, y, font, text, text_color, disabled_text_color
+      super x, y, @w, @h, font, text, text_color, disabled_text_color
       @over_text_color = over_text_color
       @down_text_color = down_text_color
       if center_x; @text_x = x + @w / 2 if @w
@@ -1136,7 +1162,7 @@ module MiniGL
       @anchor_offset_x = x; @anchor_offset_y = y
       @anchor, x, y = FormUtils.check_anchor(anchor, x, y, @w, @h)
 
-      super x, y, font, '', text_color, text_color
+      super x, y, w, h, font, '', text_color, text_color
       # @fg_left = fg_left
       # @fg_right = fg_right
       @max_value = max_value
@@ -1329,7 +1355,7 @@ module MiniGL
 
       @anchor_offset_x = x; @anchor_offset_y = y
       @anchor, x, y = FormUtils.check_anchor(anchor, x, y, @w, @h)
-      super x, y, font, options[option], text_color, disabled_text_color
+      super x, y, @w, @h, font, options[option], text_color, disabled_text_color
       @buttons[0].set_position(x, y)
 
       @options.each_with_index do |o, i|
@@ -1438,7 +1464,11 @@ module MiniGL
     # [scale_x] The horizontal scale factor.
     # [scale_y] The vertical scale factor.
     # [anchor] See parameter with the same name in <code>Panel#initialize</code> for details.
-    def initialize(x, y = nil, font = nil, text = nil, text_color = 0, disabled_text_color = 0, scale_x = 1, scale_y = 1, anchor = nil)
+    def initialize(x, y=nil, w=nil, h=nil, font=nil, text=nil,
+                   text_color=0, disabled_text_color=0,
+                   scale_x=1, scale_y=1,
+                   box_bg=nil, box_bg_disabled=nil, box_borders=nil, box_visible=true,
+                   anchor=nil)
       if x.is_a? Hash
         y = x[:y]
         font = x[:font]
@@ -1457,7 +1487,9 @@ module MiniGL
       @h = font.height * scale_y
       @anchor_offset_x = x; @anchor_offset_y = y
       @anchor, x, y = FormUtils.check_anchor(anchor, x, y, @w, @h)
-      super(x, y, font, text, text_color, disabled_text_color)
+      super(x, y, w, h, font, text,
+            text_color, disabled_text_color,
+            box_bg, box_bg_disabled, box_borders, box_visible)
     end
 
     # Draws the label.
@@ -1469,6 +1501,7 @@ module MiniGL
     #           will be drawn on top of the ones with smaller z-orders.
     # [color] Color to apply a filter to the text.
     def draw(alpha = 255, z_index = 0, color = 0xffffff)
+      super
       c = @enabled ? @text_color : @disabled_text_color
       r1 = c >> 16
       g1 = (c & 0xff00) >> 8
@@ -1480,7 +1513,7 @@ module MiniGL
       g1 *= g2; g1 /= 255
       b1 *= b2; b1 /= 255
       color = (alpha << 24) | (r1 << 16) | (g1 << 8) | b1
-      @font.draw_text(@text, @x, @y, z_index, @scale_x, @scale_y, color)
+      @font.draw_text(@text, @x, @y, z_index+100, @scale_x, @scale_y, color)
     end
   end
 end
